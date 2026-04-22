@@ -1,0 +1,10 @@
+{
+    "name": "sprint-intel-agent",
+    "version": "1.0.0",
+    "description": "OGA Sprint Intelligence Agent",
+    "private": true,
+    "dependencies": {
+        "@netlify/blobs": "^8.1.0",
+        "@netlify/functions": "^2.8.0"
+    }
+}

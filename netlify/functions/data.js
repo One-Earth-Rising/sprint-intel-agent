@@ -13,7 +13,7 @@ export const handler = async (event) => {
         return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
     }
 
-    const store = getStore({ name: 'sprint-intel', consistency: 'strong' });
+    const store = getStore({ name: 'sprint-intel' });
 
     try {
         if (event.httpMethod === 'GET') {

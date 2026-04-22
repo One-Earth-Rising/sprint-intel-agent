@@ -593,19 +593,15 @@
         function updateStatusBar() {
             const lastRunEl = document.getElementById('statusLastRun');
             const gapEl = document.getElementById('statusGap');
-            const badgeEl = document.getElementById('gapBadge');
 
             if (state.lastBriefing?.generated) {
                 lastRunEl.textContent = `LAST_RUN: ${new Date(state.lastBriefing.generated).toLocaleString()}`;
                 const gap = getGapHours();
                 const gapStr = gap < 1 ? `${Math.round(gap * 60)}m` : `${gap.toFixed(1)}h`;
-                gapEl.innerHTML = `GAP: ${gapStr} `;
                 let cls = 'fresh', label = 'FRESH';
                 if (gap > state.settings.gapThreshold * 3) { cls = 'cold'; label = 'COLD'; }
                 else if (gap > state.settings.gapThreshold) { cls = 'stale'; label = 'STALE'; }
-                badgeEl.className = `gap-indicator ${cls}`;
-                badgeEl.textContent = label;
-                gapEl.appendChild(badgeEl);
+                gapEl.innerHTML = `GAP: ${gapStr} <span class="gap-indicator ${cls}">${label}</span>`;
             } else {
                 lastRunEl.textContent = 'LAST_RUN: NEVER';
                 gapEl.textContent = 'GAP: —';

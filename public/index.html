@@ -403,6 +403,7 @@
                 <button class="primary" onclick="generateBriefing()">⚡ GENERATE SPRINT BRIEFING</button>
                 <button onclick="checkGap()">Check Gap Status</button>
                 <button onclick="loadLastBriefing()">Load Cached</button>
+                <button onclick="copyBriefing()" id="copyBtn">📋 Copy All</button>
             </div>
             <div id="statusArea"></div>
             <div id="briefing" class="briefing">Sprint briefing will appear here.
@@ -704,6 +705,46 @@
             }
             document.getElementById('briefing').textContent = state.lastBriefing.text;
             showStatus(`Loaded cached briefing from ${new Date(state.lastBriefing.generated).toLocaleString()}.`, 'ok');
+        }
+        async function copyBriefing() {
+            const briefingEl = document.getElementById('briefing');
+            const text = briefingEl.textContent || '';
+
+            if (!text.trim() || text.includes('Sprint briefing will appear here')) {
+                showStatus('Nothing to copy. Generate or load a briefing first.', 'warn');
+                return;
+            }
+
+            const btn = document.getElementById('copyBtn');
+            const originalText = btn.textContent;
+
+            try {
+                await navigator.clipboard.writeText(text);
+                btn.textContent = '✓ COPIED';
+                btn.style.background = '#39FF14';
+                btn.style.color = '#000';
+                showStatus(`Copied ${text.length} characters to clipboard.`, 'ok');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                    btn.style.color = '';
+                }, 2000);
+            } catch (e) {
+                // Fallback for older browsers or permission issues
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showStatus('Copied to clipboard.', 'ok');
+                } catch {
+                    showStatus('Copy failed. Select manually with Cmd+A / Cmd+C.', 'err');
+                }
+                document.body.removeChild(textarea);
+            }
         }
 
         // ========== AUTO-TRIGGER ==========

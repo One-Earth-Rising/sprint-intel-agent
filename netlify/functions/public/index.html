@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OGA Sprint Intel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Mono', 'Courier New', monospace;
+            background: #000;
+            color: #FFF;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            border: 2px solid #39FF14;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 0 20px #39FF1440;
+            background: rgba(57, 255, 20, 0.03);
+        }
+
+        header h1 {
+            color: #39FF14;
+            font-size: 1.4em;
+            margin-bottom: 6px;
+            text-shadow: 0 0 10px #39FF1460;
+            letter-spacing: 1px;
+        }
+
+        header .subtitle {
+            color: #888;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+
+        header .status-bar {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #39FF1430;
+            font-size: 0.75em;
+            color: #39FF14;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .panel {
+            border: 1px solid #39FF14;
+            background: rgba(57, 255, 20, 0.02);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px #39FF1420;
+        }
+
+        .panel h2 {
+            color: #39FF14;
+            font-size: 0.95em;
+            margin-bottom: 14px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .panel h2::before {
+            content: ">_ ";
+        }
+
+        .config-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .config-row label {
+            color: #CCC;
+            font-size: 0.85em;
+            min-width: 180px;
+        }
+
+        input[type="password"],
+        input[type="number"],
+        input[type="text"],
+        textarea,
+        select {
+            background: #000;
+            color: #39FF14;
+            border: 1px solid #39FF1480;
+            padding: 8px 12px;
+            font-family: inherit;
+            font-size: 0.85em;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #39FF14;
+            box-shadow: 0 0 8px #39FF1460;
+        }
+
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+            width: 100%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: transparent;
+            color: #39FF14;
+            border: 1px solid #39FF14;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85em;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+        }
+
+        button:hover:not(:disabled) {
+            background: #39FF14;
+            color: #000;
+            box-shadow: 0 0 15px #39FF1480;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button.primary {
+            background: #39FF14;
+            color: #000;
+        }
+
+        button.primary:hover:not(:disabled) {
+            box-shadow: 0 0 20px #39FF14;
+        }
+
+        .status-msg {
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-left: 3px solid #39FF14;
+            background: rgba(57, 255, 20, 0.05);
+            font-size: 0.85em;
+            color: #CCC;
+        }
+
+        .status-msg.err {
+            border-left-color: #FF3939;
+            background: rgba(255, 57, 57, 0.05);
+            color: #FF9999;
+        }
+
+        .status-msg.warn {
+            border-left-color: #FFC814;
+            background: rgba(255, 200, 20, 0.05);
+            color: #FFD966;
+        }
+
+        .gap-indicator {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.75em;
+            border: 1px solid;
+            margin-left: 8px;
+        }
+
+        .gap-indicator.fresh {
+            border-color: #39FF14;
+            color: #39FF14;
+        }
+
+        .gap-indicator.stale {
+            border-color: #FFC814;
+            color: #FFC814;
+        }
+
+        .gap-indicator.cold {
+            border-color: #FF3939;
+            color: #FF3939;
+        }
+
+        .briefing {
+            background: #000;
+            border: 2px solid #39FF14;
+            padding: 24px;
+            margin-top: 16px;
+            box-shadow: 0 0 25px #39FF1440;
+            min-height: 200px;
+            font-family: inherit;
+            white-space: pre-wrap;
+            color: #E0E0E0;
+            font-size: 0.9em;
+            line-height: 1.7;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .briefing::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .briefing::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        .briefing::-webkit-scrollbar-thumb {
+            background: #39FF14;
+        }
+
+        .loading-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #39FF14;
+            border-radius: 50%;
+            margin: 0 3px;
+            animation: pulse 1.4s infinite;
+        }
+
+        .loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.3;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        footer {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #39FF1430;
+            font-size: 0.75em;
+            color: #666;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+            gap: 20px;
+        }
+
+        .login-box {
+            border: 2px solid #39FF14;
+            padding: 40px;
+            background: rgba(57, 255, 20, 0.03);
+            box-shadow: 0 0 30px #39FF1460;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .login-box h1 {
+            color: #39FF14;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .login-box input {
+            margin: 15px 0;
+            width: 100%;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        details {
+            margin-top: 8px;
+        }
+
+        summary {
+            cursor: pointer;
+            color: #39FF14;
+            font-size: 0.85em;
+            padding: 6px 0;
+            user-select: none;
+        }
+
+        summary:hover {
+            text-shadow: 0 0 5px #39FF1460;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-box">
+            <h1>[ ACCESS REQUIRED ]</h1>
+            <div style="color:#888; font-size:0.85em; margin-bottom:10px;">OGA SPRINT INTEL // AUTH</div>
+            <input type="password" id="loginPassword" placeholder="PASSWORD" autofocus>
+            <div class="controls" style="justify-content:center;">
+                <button class="primary" onclick="doLogin()">AUTHENTICATE</button>
+            </div>
+            <div id="loginStatus"></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app" class="container hidden">
+
+        <header>
+            <h1>[ OGA_SPRINT_INTEL // ACTIVE ]</h1>
+            <div class="subtitle">AUTOMATED CONVERSATION SYNTHESIS // SPRINT BRIEFING SYSTEM</div>
+            <div class="status-bar">
+                <span id="statusLastRun">LAST_RUN: —</span>
+                <span id="statusGap">GAP: — <span id="gapBadge"></span></span>
+                <span>
+                    <a href="#" onclick="doLogout();return false;" style="color:#39FF14; text-decoration:none;">[ LOGOUT
+                        ]</a>
+                </span>
+            </div>
+        </header>
+
+        <div class="panel">
+            <h2>Configuration</h2>
+            <div class="config-row">
+                <label>AUTO_TRIGGER_GAP (hours):</label>
+                <input type="number" id="gapThreshold" value="2" min="1" max="168">
+            </div>
+            <div class="config-row">
+                <label>BRIEFING_FOCUS:</label>
+                <select id="focus">
+                    <option value="full">Full sprint briefing (all streams)</option>
+                    <option value="recent">Last 48h only</option>
+                    <option value="blockers">Blockers & open questions</option>
+                    <option value="decisions">Key decisions made</option>
+                    <option value="next">Next actions only</option>
+                </select>
+            </div>
+            <div class="controls">
+                <button onclick="saveSettings()">Save Settings</button>
+                <button onclick="clearAll()">Clear All Data</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Conversation Log Input</h2>
+            <div style="color:#888; font-size:0.75em; margin-bottom:8px; line-height:1.5;">
+                Paste conversation summaries / handovers from your OGA Ecosystem chats below. Each adds to the synthesis
+                knowledge base.
+            </div>
+            <textarea id="newConvo"
+                placeholder="Paste a conversation summary, handover note, or sprint recap here..."></textarea>
+            <div class="controls">
+                <button onclick="addConversation()">+ Add to Knowledge Base</button>
+                <button onclick="toggleStored()">View Stored (<span id="convoCount">0</span>)</button>
+            </div>
+            <div id="storedList" class="hidden" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Generate Briefing</h2>
+            <div class="controls">
+                <button class="primary" onclick="generateBriefing()">⚡ GENERATE SPRINT BRIEFING</button>
+                <button onclick="checkGap()">Check Gap Status</button>
+                <button onclick="loadLastBriefing()">Load Cached</button>
+            </div>
+            <div id="statusArea"></div>
+            <div id="briefing" class="briefing">Sprint briefing will appear here.
+
+                Configure above, paste your conversation summaries, and hit GENERATE SPRINT BRIEFING.
+
+                This agent will:
+                [1] Check time since last briefing
+                [2] If gap exceeds threshold → auto-generate fresh briefing on load
+                [3] Synthesize across all stored conversations via Claude Sonnet 4.6
+                [4] Output: state of play, workstreams, decisions, blockers, next actions
+                [5] Cache result; sync across your devices via Netlify Blobs</div>
+        </div>
+
+        <footer>
+            SYSTEM STATUS: OPERATIONAL // DATA FLOW: STABLE // CLAUDE_SONNET_4.6 // NETLIFY_BLOBS
+        </footer>
+
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let token = null;
+        let state = { conversations: [], settings: { gapThreshold: 2, focus: 'full' }, lastBriefing: null };
+
+        // ========== AUTH ==========
+        async function doLogin() {
+            const password = document.getElementById('loginPassword').value;
+            const statusEl = document.getElementById('loginStatus');
+            statusEl.innerHTML = '<div class="status-msg">Authenticating...</div>';
+
+            try {
+                const r = await fetch(`${API_BASE}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({}));
+                    throw new Error(err.error || 'Auth failed');
+                }
+                const { token: t } = await r.json();
+                token = t;
+                localStorage.setItem('sprint-token', token);
+                await enterApp();
+            } catch (e) {
+                statusEl.innerHTML = `<div class="status-msg err">${e.message}</div>`;
+            }
+        }
+
+        function doLogout() {
+            localStorage.removeItem('sprint-token');
+            token = null;
+            document.getElementById('app').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+        }
+
+        async function enterApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            await loadState();
+            await autoTriggerCheck();
+        }
+
+        // ========== DATA ==========
+        async function apiCall(path, method = 'GET', body = null) {
+            const opts = {
+                method,
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            };
+            if (body) opts.body = JSON.stringify(body);
+            const r = await fetch(`${API_BASE}/${path}`, opts);
+            if (r.status === 401) {
+                doLogout();
+                throw new Error('Session expired');
+            }
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                throw new Error(err.error || `HTTP ${r.status}`);
+            }
+            return r.json();
+        }
+
+        async function loadState() {
+            try {
+                const data = await apiCall('data');
+                state.conversations = data.conversations || [];
+                state.settings = data.settings || { gapThreshold: 2, focus: 'full' };
+                state.lastBriefing = data.lastBriefing || null;
+                document.getElementById('gapThreshold').value = state.settings.gapThreshold;
+                document.getElementById('focus').value = state.settings.focus;
+                updateConvoCount();
+                updateStatusBar();
+            } catch (e) {
+                showStatus('Failed to load state: ' + e.message, 'err');
+            }
+        }
+
+        async function saveSettings() {
+            state.settings.gapThreshold = parseInt(document.getElementById('gapThreshold').value) || 2;
+            state.settings.focus = document.getElementById('focus').value;
+            try {
+                await apiCall('data', 'POST', { type: 'settings', data: state.settings });
+                showStatus('Settings saved.', 'ok');
+            } catch (e) {
+                showStatus('Save failed: ' + e.message, 'err');
+            }
+        }
+
+        async function clearAll() {
+            if (!confirm('Clear all conversations and settings from the cloud? This affects both your machines.')) return;
+            try {
+                await apiCall('data', 'DELETE');
+                state = { conversations: [], settings: { gapThreshold: 2, focus: 'full' }, lastBriefing: null };
+                document.getElementById('newConvo').value = '';
+                document.getElementById('briefing').textContent = 'Cleared. Ready for fresh input.';
+                updateConvoCount();
+                updateStatusBar();
+                showStatus('All data cleared.', 'ok');
+            } catch (e) {
+                showStatus('Clear failed: ' + e.message, 'err');
+            }
+        }
+
+        // ========== CONVERSATIONS ==========
+        async function addConversation() {
+            const text = document.getElementById('newConvo').value.trim();
+            if (!text) { showStatus('Enter conversation text first.', 'warn'); return; }
+            state.conversations.push({ text, added: new Date().toISOString() });
+            try {
+                await apiCall('data', 'POST', { type: 'conversations', data: state.conversations });
+                document.getElementById('newConvo').value = '';
+                updateConvoCount();
+                showStatus(`Added. Total: ${state.conversations.length} in knowledge base.`, 'ok');
+            } catch (e) {
+                state.conversations.pop();
+                showStatus('Add failed: ' + e.message, 'err');
+            }
+        }
+
+        function updateConvoCount() {
+            document.getElementById('convoCount').textContent = state.conversations.length;
+        }
+
+        function toggleStored() {
+            const el = document.getElementById('storedList');
+            if (el.classList.contains('hidden')) {
+                if (state.conversations.length === 0) {
+                    el.innerHTML = '<div class="status-msg warn">No stored conversations yet.</div>';
+                } else {
+                    el.innerHTML = state.conversations.map((c, i) => `
+        <details>
+          <summary>[${i + 1}] ${new Date(c.added).toLocaleString()} — ${escapeHtml(c.text.slice(0, 80))}...</summary>
+          <div style="padding:8px; background:rgba(57,255,20,0.03); border-left:2px solid #39FF14; font-size:0.8em; white-space:pre-wrap; margin-top:6px;">${escapeHtml(c.text)}</div>
+          <button onclick="removeConvo(${i})" style="margin-top:6px; font-size:0.75em; padding:4px 10px;">Remove</button>
+        </details>
+      `).join('');
+                }
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        async function removeConvo(i) {
+            const removed = state.conversations.splice(i, 1);
+            try {
+                await apiCall('data', 'POST', { type: 'conversations', data: state.conversations });
+                updateConvoCount();
+                toggleStored(); toggleStored();
+                showStatus('Removed.', 'ok');
+            } catch (e) {
+                state.conversations.splice(i, 0, ...removed);
+                showStatus('Remove failed: ' + e.message, 'err');
+            }
+        }
+
+        function escapeHtml(s) {
+            return s.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        }
+
+        // ========== GAP DETECTION ==========
+        function getGapHours() {
+            if (!state.lastBriefing?.generated) return null;
+            return (Date.now() - new Date(state.lastBriefing.generated).getTime()) / (1000 * 60 * 60);
+        }
+
+        function updateStatusBar() {
+            const lastRunEl = document.getElementById('statusLastRun');
+            const gapEl = document.getElementById('statusGap');
+            const badgeEl = document.getElementById('gapBadge');
+
+            if (state.lastBriefing?.generated) {
+                lastRunEl.textContent = `LAST_RUN: ${new Date(state.lastBriefing.generated).toLocaleString()}`;
+                const gap = getGapHours();
+                const gapStr = gap < 1 ? `${Math.round(gap * 60)}m` : `${gap.toFixed(1)}h`;
+                gapEl.innerHTML = `GAP: ${gapStr} `;
+                let cls = 'fresh', label = 'FRESH';
+                if (gap > state.settings.gapThreshold * 3) { cls = 'cold'; label = 'COLD'; }
+                else if (gap > state.settings.gapThreshold) { cls = 'stale'; label = 'STALE'; }
+                badgeEl.className = `gap-indicator ${cls}`;
+                badgeEl.textContent = label;
+                gapEl.appendChild(badgeEl);
+            } else {
+                lastRunEl.textContent = 'LAST_RUN: NEVER';
+                gapEl.textContent = 'GAP: —';
+            }
+        }
+
+        function checkGap() {
+            updateStatusBar();
+            const gap = getGapHours();
+            if (gap === null) {
+                showStatus('No previous briefing on record.', 'warn');
+            } else if (gap > state.settings.gapThreshold) {
+                showStatus(`Gap of ${gap.toFixed(1)}h exceeds threshold (${state.settings.gapThreshold}h). Fresh briefing recommended.`, 'warn');
+            } else {
+                showStatus(`Recent briefing (${gap.toFixed(1)}h ago). Cached version fresh.`, 'ok');
+            }
+        }
+
+        // ========== BRIEFING ==========
+        async function generateBriefing() {
+            if (state.conversations.length === 0) {
+                showStatus('Add at least one conversation first.', 'err');
+                return;
+            }
+            const briefingEl = document.getElementById('briefing');
+            briefingEl.innerHTML = '<span style="color:#39FF14;">SYNTHESIZING</span> <span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+            showStatus('Querying Claude Sonnet 4.6...', 'ok');
+
+            try {
+                const data = await apiCall('generate', 'POST', {
+                    conversations: state.conversations,
+                    focus: state.settings.focus
+                });
+
+                state.lastBriefing = {
+                    text: data.briefing,
+                    generated: new Date().toISOString(),
+                    usage: data.usage
+                };
+                await apiCall('data', 'POST', { type: 'last-briefing', data: state.lastBriefing });
+
+                briefingEl.textContent = data.briefing;
+                updateStatusBar();
+                showStatus(`Briefing generated. ${data.usage?.input_tokens || '?'} in / ${data.usage?.output_tokens || '?'} out tokens.`, 'ok');
+            } catch (e) {
+                briefingEl.textContent = `ERROR: ${e.message}`;
+                showStatus('Generation failed: ' + e.message, 'err');
+            }
+        }
+
+        function loadLastBriefing() {
+            if (!state.lastBriefing?.text) {
+                showStatus('No cached briefing available.', 'warn');
+                return;
+            }
+            document.getElementById('briefing').textContent = state.lastBriefing.text;
+            showStatus(`Loaded cached briefing from ${new Date(state.lastBriefing.generated).toLocaleString()}.`, 'ok');
+        }
+
+        // ========== AUTO-TRIGGER ==========
+        async function autoTriggerCheck() {
+            const gap = getGapHours();
+            if (gap === null) {
+                if (state.conversations.length > 0) {
+                    showStatus('No prior briefing. Click GENERATE SPRINT BRIEFING.', 'warn');
+                }
+                return;
+            }
+            if (gap > state.settings.gapThreshold && state.conversations.length > 0) {
+                showStatus(`Gap of ${gap.toFixed(1)}h exceeds threshold. Auto-generating...`, 'warn');
+                setTimeout(generateBriefing, 1000);
+            } else if (state.lastBriefing?.text) {
+                document.getElementById('briefing').textContent = state.lastBriefing.text;
+                showStatus(`Loaded cached briefing (${gap.toFixed(1)}h old, within threshold).`, 'ok');
+            }
+        }
+
+        // ========== HELPERS ==========
+        function showStatus(msg, type = 'ok') {
+            const area = document.getElementById('statusArea');
+            const cls = type === 'err' ? 'err' : type === 'warn' ? 'warn' : '';
+            area.innerHTML = `<div class="status-msg ${cls}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+        }
+
+        // ========== INIT ==========
+        (async function init() {
+            token = localStorage.getItem('sprint-token');
+            if (token) {
+                try {
+                    await apiCall('data');
+                    await enterApp();
+                } catch {
+                    doLogout();
+                }
+            }
+            document.getElementById('loginPassword')?.addEventListener('keydown', e => {
+                if (e.key === 'Enter') doLogin();
+            });
+        })();
+    </script>
+</body>
+
+</html>

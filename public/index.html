@@ -628,24 +628,69 @@
             }
             const briefingEl = document.getElementById('briefing');
             briefingEl.innerHTML = '<span style="color:#39FF14;">SYNTHESIZING</span> <span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
-            showStatus('Querying Claude Sonnet 4.6...', 'ok');
+            showStatus('Streaming from Claude Sonnet 4.6...', 'ok');
 
             try {
-                const data = await apiCall('generate', 'POST', {
-                    conversations: state.conversations,
-                    focus: state.settings.focus
+                const res = await fetch(`${API_BASE}/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        conversations: state.conversations,
+                        focus: state.settings.focus
+                    })
                 });
 
+                if (res.status === 401) { doLogout(); throw new Error('Session expired'); }
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+
+                // Stream reader — parses Anthropic SSE format
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let briefing = '';
+                let buffer = '';
+
+                briefingEl.textContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Parse SSE events — split on double newline
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const jsonStr = line.slice(6).trim();
+                        if (!jsonStr) continue;
+                        try {
+                            const evt = JSON.parse(jsonStr);
+                            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+                                briefing += evt.delta.text;
+                                briefingEl.textContent = briefing;
+                            }
+                        } catch (e) {
+                            // Ignore parse errors on partial chunks
+                        }
+                    }
+                }
+
+                // Cache the full briefing
                 state.lastBriefing = {
-                    text: data.briefing,
-                    generated: new Date().toISOString(),
-                    usage: data.usage
+                    text: briefing,
+                    generated: new Date().toISOString()
                 };
                 await apiCall('data', 'POST', { type: 'last-briefing', data: state.lastBriefing });
 
-                briefingEl.textContent = data.briefing;
                 updateStatusBar();
-                showStatus(`Briefing generated. ${data.usage?.input_tokens || '?'} in / ${data.usage?.output_tokens || '?'} out tokens.`, 'ok');
+                showStatus(`Briefing complete. ${briefing.length} chars generated.`, 'ok');
             } catch (e) {
                 briefingEl.textContent = `ERROR: ${e.message}`;
                 showStatus('Generation failed: ' + e.message, 'err');

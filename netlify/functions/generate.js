@@ -1,4 +1,5 @@
-// Proxies the Claude API call. Keeps ANTHROPIC_API_KEY server-side.
+// Streaming generate endpoint — bypasses the 26s timeout by streaming
+// Claude's response as Server-Sent Events (SSE) back to the browser.
 
 import { validateToken } from './auth.js';
 
@@ -39,29 +40,41 @@ const FOCUS_PROMPTS = {
     next: 'List concrete next actions, prioritized, with owners if identifiable.'
 };
 
-export const handler = async (event) => {
-    const token = event.headers.authorization?.replace('Bearer ', '');
+// Netlify's modern function signature — Request in, Response out.
+// This is required for streaming (the legacy handler() signature can't stream).
+export default async (req) => {
+    // Auth
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!validateToken(token)) {
-        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 
-    if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method not allowed' };
+    if (req.method !== 'POST') {
+        return new Response('Method not allowed', { status: 405 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-        return { statusCode: 500, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }) };
+        return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 
-    try {
-        const { conversations, focus } = JSON.parse(event.body || '{}');
+    const body = await req.json();
+    const { conversations, focus } = body;
 
-        if (!conversations || !Array.isArray(conversations) || conversations.length === 0) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'No conversations provided' }) };
-        }
+    if (!conversations?.length) {
+        return new Response(JSON.stringify({ error: 'No conversations provided' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
 
-        const userPrompt = `${FOCUS_PROMPTS[focus] || FOCUS_PROMPTS.full}
+    const userPrompt = `${FOCUS_PROMPTS[focus] || FOCUS_PROMPTS.full}
 
 Here are the conversation summaries / handover notes from my OGA Ecosystem project (in chronological order of addition):
 
@@ -69,44 +82,41 @@ ${conversations.map((c, i) => `--- CONVERSATION ${i + 1} (added ${new Date(c.add
 
 Synthesize these into my sprint briefing for ${new Date().toLocaleDateString()}.`;
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-5',
-                max_tokens: 4000,
-                system: SYSTEM_PROMPT,
-                messages: [{ role: 'user', content: userPrompt }]
-            })
+    // Call Claude with streaming enabled
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 4000,
+            stream: true,
+            system: SYSTEM_PROMPT,
+            messages: [{ role: 'user', content: userPrompt }]
+        })
+    });
+
+    if (!claudeRes.ok) {
+        const errText = await claudeRes.text();
+        return new Response(JSON.stringify({ error: `Claude API: ${errText}` }), {
+            status: claudeRes.status,
+            headers: { 'Content-Type': 'application/json' }
         });
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return {
-                statusCode: response.status,
-                body: JSON.stringify({ error: `Claude API: ${errText}` })
-            };
-        }
-
-        const data = await response.json();
-        const briefing = data.content
-            .filter(b => b.type === 'text')
-            .map(b => b.text)
-            .join('\n');
-
-        return {
-            statusCode: 200,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                briefing,
-                usage: data.usage
-            })
-        };
-    } catch (e) {
-        return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
     }
+
+    // Pipe Claude's SSE stream directly to the browser.
+    // Netlify's edge streams the response — no function timeout applies.
+    return new Response(claudeRes.body, {
+        status: 200,
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        }
+    });
 };
+
+export const config = { path: '/api/generate' };

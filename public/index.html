@@ -600,13 +600,28 @@
         }
 
         function viewKB() {
-            document.getElementById('kbPanel').classList.remove('hidden');
-            if (state.knowledgeBase.text) {
-                document.getElementById('kbDisplay').textContent = state.knowledgeBase.text;
-            } else {
-                document.getElementById('kbDisplay').textContent = 'No knowledge base yet. Add a handover above.';
+            const panel = document.getElementById('kbPanel');
+            const display = document.getElementById('kbDisplay');
+
+            // Toggle: if already visible, hide it
+            if (!panel.classList.contains('hidden')) {
+                panel.classList.add('hidden');
+                return;
             }
+
+            // Show and populate
+            panel.classList.remove('hidden');
+
+            if (state.knowledgeBase && state.knowledgeBase.text) {
+                display.textContent = state.knowledgeBase.text;
+            } else {
+                display.textContent = 'No knowledge base yet. Add a handover above to create one.';
+            }
+
             updateKBMeta();
+
+            // Scroll the panel into view so user sees it
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function updateKBMeta() {

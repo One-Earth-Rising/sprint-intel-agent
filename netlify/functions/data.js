@@ -1,13 +1,11 @@
-// CRUD for conversations + settings, backed by Netlify Blobs.
+// CRUD for the rolling knowledge base + briefing cache.
 
 import { getStore, connectLambda } from '@netlify/blobs';
 import { validateToken } from './auth.js';
 
 export const handler = async (event) => {
-    // Initialize Blobs environment (works in both native + Lambda compat modes)
-    try { connectLambda(event); } catch (e) { /* non-Lambda mode, ignore */ }
+    try { connectLambda(event); } catch (e) { /* native mode */ }
 
-    // Auth check
     const token = event.headers.authorization?.replace('Bearer ', '');
     if (!validateToken(token)) {
         return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
@@ -17,43 +15,40 @@ export const handler = async (event) => {
 
     try {
         if (event.httpMethod === 'GET') {
-            const [conversations, settings, lastBriefing] = await Promise.all([
-                store.get('conversations', { type: 'json' }),
+            const [knowledgeBase, settings, lastBriefing, history] = await Promise.all([
+                store.get('knowledge-base', { type: 'json' }),
                 store.get('settings', { type: 'json' }),
-                store.get('last-briefing', { type: 'json' })
+                store.get('last-briefing', { type: 'json' }),
+                store.get('handover-history', { type: 'json' })
             ]);
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    conversations: conversations || [],
+                    knowledgeBase: knowledgeBase || { text: '', updated: null, version: 0 },
                     settings: settings || { gapThreshold: 2, focus: 'full' },
-                    lastBriefing: lastBriefing || null
+                    lastBriefing: lastBriefing || null,
+                    history: history || []
                 })
             };
         }
 
         if (event.httpMethod === 'POST') {
             const { type, data } = JSON.parse(event.body || '{}');
-
-            if (type === 'conversations') {
-                await store.setJSON('conversations', data);
-            } else if (type === 'settings') {
-                await store.setJSON('settings', data);
-            } else if (type === 'last-briefing') {
-                await store.setJSON('last-briefing', data);
-            } else {
+            const valid = ['knowledge-base', 'settings', 'last-briefing', 'handover-history'];
+            if (!valid.includes(type)) {
                 return { statusCode: 400, body: JSON.stringify({ error: 'Invalid type' }) };
             }
-
+            await store.setJSON(type, data);
             return { statusCode: 200, body: JSON.stringify({ ok: true }) };
         }
 
         if (event.httpMethod === 'DELETE') {
             await Promise.all([
-                store.delete('conversations'),
+                store.delete('knowledge-base'),
                 store.delete('settings'),
-                store.delete('last-briefing')
+                store.delete('last-briefing'),
+                store.delete('handover-history')
             ]);
             return { statusCode: 200, body: JSON.stringify({ ok: true }) };
         }

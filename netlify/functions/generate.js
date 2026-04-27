@@ -1,13 +1,12 @@
-// Streaming generate endpoint — bypasses the 26s timeout by streaming
-// Claude's response as Server-Sent Events (SSE) back to the browser.
+// Generates a sprint briefing by reading from the rolling KB (small input!).
 
 import { validateToken } from './auth.js';
 
-const SYSTEM_PROMPT = `You are the OGA Ecosystem Sprint Intelligence Agent. Your job is to synthesize a user's past conversation summaries into a clear, actionable sprint briefing so they can resume work with full context.
+const SYSTEM_PROMPT = `You are the OGA Ecosystem Sprint Briefing generator for Jan, CEO of One Earth Rising (OER).
 
-The user is Jan, CEO of One Earth Rising (OER), building the OGA (Ownable Game Asset) ecosystem — a gaming infrastructure platform involving brand partnerships, patent-backed tech, a design system (Heimdal Aesthetic), and multiple product surfaces.
+You produce concise, actionable sprint briefings based on the user's current knowledge base. The KB contains everything you need — don't ask for more context.
 
-Output format (use plain text with clear section headers, NO markdown symbols like # or *):
+Output format (plain text, no markdown symbols):
 
 === OGA SPRINT BRIEFING ===
 Generated: [timestamp]
@@ -16,39 +15,35 @@ Generated: [timestamp]
 2-3 sentences on where things stand overall.
 
 [ACTIVE WORKSTREAMS]
-Bullet list of current active threads with one-line status each.
+Bullet list with one-line status each.
 
 [RECENT DECISIONS]
-Concrete decisions made, with context.
+What got decided recently.
 
 [OPEN QUESTIONS / BLOCKERS]
-Anything unresolved.
+What's unresolved.
 
 [NEXT ACTIONS]
 Prioritized list of what to do next.
 
 [CONTEXT NOTES]
-Anything else Jan should remember when resuming.
+Anything else worth remembering.
 
-Be concise, specific, and reference actual items from the source material. Never invent details.`;
+Be specific and reference actual items from the KB. Never invent details.`;
 
 const FOCUS_PROMPTS = {
     full: 'Produce a comprehensive sprint briefing covering all workstreams.',
-    recent: 'Focus only on developments from the last 48 hours.',
-    blockers: 'Surface all blockers, unresolved questions, and items awaiting decision.',
-    decisions: 'List the key decisions made and their rationale.',
-    next: 'List concrete next actions, prioritized, with owners if identifiable.'
+    recent: 'Focus on the most recent developments and active items.',
+    blockers: 'Surface blockers, unresolved questions, and items awaiting decision.',
+    decisions: 'List recent decisions and their rationale.',
+    next: 'Prioritized next actions only, with owners if identifiable.'
 };
 
-// Netlify's modern function signature — Request in, Response out.
-// This is required for streaming (the legacy handler() signature can't stream).
 export default async (req) => {
-    // Auth
     const token = req.headers.get('authorization')?.replace('Bearer ', '');
     if (!validateToken(token)) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
+            status: 401, headers: { 'Content-Type': 'application/json' }
         });
     }
 
@@ -59,30 +54,26 @@ export default async (req) => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
         return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
+            status: 500, headers: { 'Content-Type': 'application/json' }
         });
     }
 
-    const body = await req.json();
-    const { conversations, focus } = body;
+    const { knowledgeBase, focus } = await req.json();
 
-    if (!conversations?.length) {
-        return new Response(JSON.stringify({ error: 'No conversations provided' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
+    if (!knowledgeBase?.text) {
+        return new Response(JSON.stringify({ error: 'Knowledge base is empty. Add a handover first.' }), {
+            status: 400, headers: { 'Content-Type': 'application/json' }
         });
     }
 
     const userPrompt = `${FOCUS_PROMPTS[focus] || FOCUS_PROMPTS.full}
 
-Here are the conversation summaries / handover notes from my OGA Ecosystem project (in chronological order of addition):
+Here is my current knowledge base:
 
-${conversations.map((c, i) => `--- CONVERSATION ${i + 1} (added ${new Date(c.added).toLocaleString()}) ---\n${c.text}`).join('\n\n')}
+${knowledgeBase.text}
 
-Synthesize these into my sprint briefing for ${new Date().toLocaleDateString()}.`;
+Generate the sprint briefing for ${new Date().toLocaleDateString()}.`;
 
-    // Call Claude with streaming enabled
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -92,7 +83,7 @@ Synthesize these into my sprint briefing for ${new Date().toLocaleDateString()}.
         },
         body: JSON.stringify({
             model: 'claude-sonnet-4-5',
-            max_tokens: 16000,
+            max_tokens: 4000,
             stream: true,
             system: SYSTEM_PROMPT,
             messages: [{ role: 'user', content: userPrompt }]
@@ -102,13 +93,10 @@ Synthesize these into my sprint briefing for ${new Date().toLocaleDateString()}.
     if (!claudeRes.ok) {
         const errText = await claudeRes.text();
         return new Response(JSON.stringify({ error: `Claude API: ${errText}` }), {
-            status: claudeRes.status,
-            headers: { 'Content-Type': 'application/json' }
+            status: claudeRes.status, headers: { 'Content-Type': 'application/json' }
         });
     }
 
-    // Pipe Claude's SSE stream directly to the browser.
-    // Netlify's edge streams the response — no function timeout applies.
     return new Response(claudeRes.body, {
         status: 200,
         headers: {

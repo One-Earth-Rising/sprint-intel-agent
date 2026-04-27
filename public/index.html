@@ -208,7 +208,8 @@
             color: #FF3939;
         }
 
-        .briefing {
+        .briefing,
+        .kb-display {
             background: #000;
             border: 2px solid #39FF14;
             padding: 24px;
@@ -224,15 +225,18 @@
             overflow-y: auto;
         }
 
-        .briefing::-webkit-scrollbar {
+        .briefing::-webkit-scrollbar,
+        .kb-display::-webkit-scrollbar {
             width: 8px;
         }
 
-        .briefing::-webkit-scrollbar-track {
+        .briefing::-webkit-scrollbar-track,
+        .kb-display::-webkit-scrollbar-track {
             background: #000;
         }
 
-        .briefing::-webkit-scrollbar-thumb {
+        .briefing::-webkit-scrollbar-thumb,
+        .kb-display::-webkit-scrollbar-thumb {
             background: #39FF14;
         }
 
@@ -311,27 +315,20 @@
             display: none !important;
         }
 
-        details {
-            margin-top: 8px;
+        .kb-meta {
+            font-size: 0.75em;
+            color: #888;
+            margin-bottom: 8px;
         }
 
-        summary {
-            cursor: pointer;
+        .kb-meta strong {
             color: #39FF14;
-            font-size: 0.85em;
-            padding: 6px 0;
-            user-select: none;
-        }
-
-        summary:hover {
-            text-shadow: 0 0 5px #39FF1460;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- LOGIN SCREEN -->
     <div id="loginScreen" class="login-screen">
         <div class="login-box">
             <h1>[ ACCESS REQUIRED ]</h1>
@@ -344,21 +341,58 @@
         </div>
     </div>
 
-    <!-- MAIN APP -->
     <div id="app" class="container hidden">
 
         <header>
-            <h1>[ OGA_SPRINT_INTEL // ACTIVE ]</h1>
-            <div class="subtitle">AUTOMATED CONVERSATION SYNTHESIS // SPRINT BRIEFING SYSTEM</div>
+            <h1>[ OGA_SPRINT_INTEL // ROLLING_KB ]</h1>
+            <div class="subtitle">SELF-MAINTAINING KNOWLEDGE BASE // SPRINT BRIEFING SYSTEM</div>
             <div class="status-bar">
-                <span id="statusLastRun">LAST_RUN: —</span>
-                <span id="statusGap">GAP: — <span id="gapBadge"></span></span>
-                <span>
-                    <a href="#" onclick="doLogout();return false;" style="color:#39FF14; text-decoration:none;">[ LOGOUT
-                        ]</a>
-                </span>
+                <span id="statusLastRun">LAST_BRIEFING: —</span>
+                <span id="statusGap">GAP: —</span>
+                <span id="statusKB">KB_VERSION: 0</span>
+                <span><a href="#" onclick="doLogout();return false;" style="color:#39FF14; text-decoration:none;">[
+                        LOGOUT ]</a></span>
             </div>
         </header>
+
+        <div class="panel">
+            <h2>1. Add Handover (Merges into Knowledge Base)</h2>
+            <div style="color:#888; font-size:0.75em; margin-bottom:8px; line-height:1.5;">
+                Paste a handover from a recent chat. It will be merged into your rolling knowledge base — older info
+                gets updated, new info gets added, the KB stays compact.
+            </div>
+            <textarea id="newHandover" placeholder="Paste a handover from a recent chat..."></textarea>
+            <div class="controls">
+                <button class="primary" onclick="mergeHandover()">⚡ MERGE INTO KB</button>
+                <button onclick="viewKB()">View Current KB</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>2. Generate Sprint Briefing</h2>
+            <div class="config-row">
+                <label>BRIEFING_FOCUS:</label>
+                <select id="focus">
+                    <option value="full">Full sprint briefing (all streams)</option>
+                    <option value="recent">Recent developments only</option>
+                    <option value="blockers">Blockers & open questions</option>
+                    <option value="decisions">Key decisions made</option>
+                    <option value="next">Next actions only</option>
+                </select>
+            </div>
+            <div class="controls">
+                <button class="primary" onclick="generateBriefing()">⚡ GENERATE BRIEFING</button>
+                <button onclick="loadLastBriefing()">Load Cached</button>
+                <button onclick="copyBriefing()" id="copyBtn">📋 Copy All</button>
+            </div>
+            <div id="statusArea"></div>
+            <div id="briefing" class="briefing">Sprint briefing will appear here.
+
+                Workflow:
+                1. Paste handover above → MERGE INTO KB (one-time per chat)
+                2. Click GENERATE BRIEFING (anytime)
+                3. Copy briefing → paste into next Claude.ai chat as context</div>
+        </div>
 
         <div class="panel">
             <h2>Configuration</h2>
@@ -366,60 +400,24 @@
                 <label>AUTO_TRIGGER_GAP (hours):</label>
                 <input type="number" id="gapThreshold" value="2" min="1" max="168">
             </div>
-            <div class="config-row">
-                <label>BRIEFING_FOCUS:</label>
-                <select id="focus">
-                    <option value="full">Full sprint briefing (all streams)</option>
-                    <option value="recent">Last 48h only</option>
-                    <option value="blockers">Blockers & open questions</option>
-                    <option value="decisions">Key decisions made</option>
-                    <option value="next">Next actions only</option>
-                </select>
-            </div>
             <div class="controls">
                 <button onclick="saveSettings()">Save Settings</button>
-                <button onclick="clearAll()">Clear All Data</button>
+                <button onclick="clearAll()" style="border-color:#FF3939; color:#FF3939;">Clear All Data</button>
             </div>
         </div>
 
-        <div class="panel">
-            <h2>Conversation Log Input</h2>
-            <div style="color:#888; font-size:0.75em; margin-bottom:8px; line-height:1.5;">
-                Paste conversation summaries / handovers from your OGA Ecosystem chats below. Each adds to the synthesis
-                knowledge base.
-            </div>
-            <textarea id="newConvo"
-                placeholder="Paste a conversation summary, handover note, or sprint recap here..."></textarea>
+        <div id="kbPanel" class="panel hidden">
+            <h2>Current Knowledge Base</h2>
+            <div class="kb-meta" id="kbMeta"></div>
+            <div id="kbDisplay" class="kb-display">No knowledge base yet. Add a handover above.</div>
             <div class="controls">
-                <button onclick="addConversation()">+ Add to Knowledge Base</button>
-                <button onclick="toggleStored()">View Stored (<span id="convoCount">0</span>)</button>
+                <button onclick="copyKB()" id="copyKBBtn">📋 Copy KB</button>
+                <button onclick="document.getElementById('kbPanel').classList.add('hidden')">Hide</button>
             </div>
-            <div id="storedList" class="hidden" style="margin-top:12px;"></div>
-        </div>
-
-        <div class="panel">
-            <h2>Generate Briefing</h2>
-            <div class="controls">
-                <button class="primary" onclick="generateBriefing()">⚡ GENERATE SPRINT BRIEFING</button>
-                <button onclick="checkGap()">Check Gap Status</button>
-                <button onclick="loadLastBriefing()">Load Cached</button>
-                <button onclick="copyBriefing()" id="copyBtn">📋 Copy All</button>
-            </div>
-            <div id="statusArea"></div>
-            <div id="briefing" class="briefing">Sprint briefing will appear here.
-
-                Configure above, paste your conversation summaries, and hit GENERATE SPRINT BRIEFING.
-
-                This agent will:
-                [1] Check time since last briefing
-                [2] If gap exceeds threshold → auto-generate fresh briefing on load
-                [3] Synthesize across all stored conversations via Claude Sonnet 4.6
-                [4] Output: state of play, workstreams, decisions, blockers, next actions
-                [5] Cache result; sync across your devices via Netlify Blobs</div>
         </div>
 
         <footer>
-            SYSTEM STATUS: OPERATIONAL // DATA FLOW: STABLE // CLAUDE_SONNET_4.6 // NETLIFY_BLOBS
+            ROLLING KB ARCHITECTURE // CLAUDE_SONNET_4.5 // NETLIFY_BLOBS
         </footer>
 
     </div>
@@ -427,18 +425,21 @@
     <script>
         const API_BASE = '/api';
         let token = null;
-        let state = { conversations: [], settings: { gapThreshold: 2, focus: 'full' }, lastBriefing: null };
+        let state = {
+            knowledgeBase: { text: '', updated: null, version: 0 },
+            settings: { gapThreshold: 2, focus: 'full' },
+            lastBriefing: null,
+            history: []
+        };
 
-        // ========== AUTH ==========
+        // AUTH
         async function doLogin() {
             const password = document.getElementById('loginPassword').value;
             const statusEl = document.getElementById('loginStatus');
             statusEl.innerHTML = '<div class="status-msg">Authenticating...</div>';
-
             try {
                 const r = await fetch(`${API_BASE}/auth`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })
                 });
                 if (!r.ok) {
@@ -465,21 +466,16 @@
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('app').classList.remove('hidden');
             await loadState();
-            await autoTriggerCheck();
         }
 
-        // ========== DATA ==========
+        // API
         async function apiCall(path, method = 'GET', body = null) {
             const opts = {
-                method,
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             };
             if (body) opts.body = JSON.stringify(body);
             const r = await fetch(`${API_BASE}/${path}`, opts);
-            if (r.status === 401) {
-                doLogout();
-                throw new Error('Session expired');
-            }
+            if (r.status === 401) { doLogout(); throw new Error('Session expired'); }
             if (!r.ok) {
                 const err = await r.json().catch(() => ({}));
                 throw new Error(err.error || `HTTP ${r.status}`);
@@ -490,12 +486,12 @@
         async function loadState() {
             try {
                 const data = await apiCall('data');
-                state.conversations = data.conversations || [];
+                state.knowledgeBase = data.knowledgeBase || { text: '', updated: null, version: 0 };
                 state.settings = data.settings || { gapThreshold: 2, focus: 'full' };
                 state.lastBriefing = data.lastBriefing || null;
+                state.history = data.history || [];
                 document.getElementById('gapThreshold').value = state.settings.gapThreshold;
                 document.getElementById('focus').value = state.settings.focus;
-                updateConvoCount();
                 updateStatusBar();
             } catch (e) {
                 showStatus('Failed to load state: ' + e.message, 'err');
@@ -514,13 +510,13 @@
         }
 
         async function clearAll() {
-            if (!confirm('Clear all conversations and settings from the cloud? This affects both your machines.')) return;
+            if (!confirm('Clear ALL data including knowledge base? This cannot be undone.')) return;
             try {
                 await apiCall('data', 'DELETE');
-                state = { conversations: [], settings: { gapThreshold: 2, focus: 'full' }, lastBriefing: null };
-                document.getElementById('newConvo').value = '';
-                document.getElementById('briefing').textContent = 'Cleared. Ready for fresh input.';
-                updateConvoCount();
+                state = { knowledgeBase: { text: '', updated: null, version: 0 }, settings: { gapThreshold: 2, focus: 'full' }, lastBriefing: null, history: [] };
+                document.getElementById('newHandover').value = '';
+                document.getElementById('briefing').textContent = 'Cleared. Add a handover to begin.';
+                document.getElementById('kbDisplay').textContent = 'No knowledge base yet.';
                 updateStatusBar();
                 showStatus('All data cleared.', 'ok');
             } catch (e) {
@@ -528,120 +524,21 @@
             }
         }
 
-        // ========== CONVERSATIONS ==========
-        async function addConversation() {
-            const text = document.getElementById('newConvo').value.trim();
-            if (!text) { showStatus('Enter conversation text first.', 'warn'); return; }
-            state.conversations.push({ text, added: new Date().toISOString() });
-            try {
-                await apiCall('data', 'POST', { type: 'conversations', data: state.conversations });
-                document.getElementById('newConvo').value = '';
-                updateConvoCount();
-                showStatus(`Added. Total: ${state.conversations.length} in knowledge base.`, 'ok');
-            } catch (e) {
-                state.conversations.pop();
-                showStatus('Add failed: ' + e.message, 'err');
-            }
-        }
+        // MERGE HANDOVER (the new core flow)
+        async function mergeHandover() {
+            const handover = document.getElementById('newHandover').value.trim();
+            if (!handover) { showStatus('Paste a handover first.', 'warn'); return; }
 
-        function updateConvoCount() {
-            document.getElementById('convoCount').textContent = state.conversations.length;
-        }
-
-        function toggleStored() {
-            const el = document.getElementById('storedList');
-            if (el.classList.contains('hidden')) {
-                if (state.conversations.length === 0) {
-                    el.innerHTML = '<div class="status-msg warn">No stored conversations yet.</div>';
-                } else {
-                    el.innerHTML = state.conversations.map((c, i) => `
-        <details>
-          <summary>[${i + 1}] ${new Date(c.added).toLocaleString()} — ${escapeHtml(c.text.slice(0, 80))}...</summary>
-          <div style="padding:8px; background:rgba(57,255,20,0.03); border-left:2px solid #39FF14; font-size:0.8em; white-space:pre-wrap; margin-top:6px;">${escapeHtml(c.text)}</div>
-          <button onclick="removeConvo(${i})" style="margin-top:6px; font-size:0.75em; padding:4px 10px;">Remove</button>
-        </details>
-      `).join('');
-                }
-                el.classList.remove('hidden');
-            } else {
-                el.classList.add('hidden');
-            }
-        }
-
-        async function removeConvo(i) {
-            const removed = state.conversations.splice(i, 1);
-            try {
-                await apiCall('data', 'POST', { type: 'conversations', data: state.conversations });
-                updateConvoCount();
-                toggleStored(); toggleStored();
-                showStatus('Removed.', 'ok');
-            } catch (e) {
-                state.conversations.splice(i, 0, ...removed);
-                showStatus('Remove failed: ' + e.message, 'err');
-            }
-        }
-
-        function escapeHtml(s) {
-            return s.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-        }
-
-        // ========== GAP DETECTION ==========
-        function getGapHours() {
-            if (!state.lastBriefing?.generated) return null;
-            return (Date.now() - new Date(state.lastBriefing.generated).getTime()) / (1000 * 60 * 60);
-        }
-
-        function updateStatusBar() {
-            const lastRunEl = document.getElementById('statusLastRun');
-            const gapEl = document.getElementById('statusGap');
-
-            if (state.lastBriefing?.generated) {
-                lastRunEl.textContent = `LAST_RUN: ${new Date(state.lastBriefing.generated).toLocaleString()}`;
-                const gap = getGapHours();
-                const gapStr = gap < 1 ? `${Math.round(gap * 60)}m` : `${gap.toFixed(1)}h`;
-                let cls = 'fresh', label = 'FRESH';
-                if (gap > state.settings.gapThreshold * 3) { cls = 'cold'; label = 'COLD'; }
-                else if (gap > state.settings.gapThreshold) { cls = 'stale'; label = 'STALE'; }
-                gapEl.innerHTML = `GAP: ${gapStr} <span class="gap-indicator ${cls}">${label}</span>`;
-            } else {
-                lastRunEl.textContent = 'LAST_RUN: NEVER';
-                gapEl.textContent = 'GAP: —';
-            }
-        }
-
-        function checkGap() {
-            updateStatusBar();
-            const gap = getGapHours();
-            if (gap === null) {
-                showStatus('No previous briefing on record.', 'warn');
-            } else if (gap > state.settings.gapThreshold) {
-                showStatus(`Gap of ${gap.toFixed(1)}h exceeds threshold (${state.settings.gapThreshold}h). Fresh briefing recommended.`, 'warn');
-            } else {
-                showStatus(`Recent briefing (${gap.toFixed(1)}h ago). Cached version fresh.`, 'ok');
-            }
-        }
-
-        // ========== BRIEFING ==========
-        async function generateBriefing() {
-            if (state.conversations.length === 0) {
-                showStatus('Add at least one conversation first.', 'err');
-                return;
-            }
-            const briefingEl = document.getElementById('briefing');
-            briefingEl.innerHTML = '<span style="color:#39FF14;">SYNTHESIZING</span> <span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
-            showStatus('Streaming from Claude Sonnet 4.6...', 'ok');
+            showStatus('Merging into knowledge base...', 'ok');
+            document.getElementById('kbPanel').classList.remove('hidden');
+            const kbDisplay = document.getElementById('kbDisplay');
+            kbDisplay.innerHTML = '<span style="color:#39FF14;">MERGING</span> <span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
 
             try {
-                const res = await fetch(`${API_BASE}/generate`, {
+                const res = await fetch(`${API_BASE}/merge`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        conversations: state.conversations,
-                        focus: state.settings.focus
-                    })
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ existingKB: state.knowledgeBase, newHandover: handover })
                 });
 
                 if (res.status === 401) { doLogout(); throw new Error('Session expired'); }
@@ -650,23 +547,112 @@
                     throw new Error(err.error || `HTTP ${res.status}`);
                 }
 
-                // Stream reader — parses Anthropic SSE format
+                // Stream
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let newKBText = '';
+                let buffer = '';
+                kbDisplay.textContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const jsonStr = line.slice(6).trim();
+                        if (!jsonStr) continue;
+                        try {
+                            const evt = JSON.parse(jsonStr);
+                            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+                                newKBText += evt.delta.text;
+                                kbDisplay.textContent = newKBText;
+                            }
+                        } catch { }
+                    }
+                }
+
+                // Update state
+                state.knowledgeBase = {
+                    text: newKBText,
+                    updated: new Date().toISOString(),
+                    version: (state.knowledgeBase.version || 0) + 1
+                };
+                state.history = [...(state.history || []), {
+                    added: new Date().toISOString(),
+                    preview: handover.slice(0, 200),
+                    kbVersionAfter: state.knowledgeBase.version
+                }].slice(-50); // keep last 50
+
+                await apiCall('data', 'POST', { type: 'knowledge-base', data: state.knowledgeBase });
+                await apiCall('data', 'POST', { type: 'handover-history', data: state.history });
+
+                document.getElementById('newHandover').value = '';
+                updateKBMeta();
+                updateStatusBar();
+                showStatus(`KB updated to v${state.knowledgeBase.version}. ${newKBText.length} chars.`, 'ok');
+            } catch (e) {
+                kbDisplay.textContent = `ERROR: ${e.message}`;
+                showStatus('Merge failed: ' + e.message, 'err');
+            }
+        }
+
+        function viewKB() {
+            document.getElementById('kbPanel').classList.remove('hidden');
+            if (state.knowledgeBase.text) {
+                document.getElementById('kbDisplay').textContent = state.knowledgeBase.text;
+            } else {
+                document.getElementById('kbDisplay').textContent = 'No knowledge base yet. Add a handover above.';
+            }
+            updateKBMeta();
+        }
+
+        function updateKBMeta() {
+            const meta = document.getElementById('kbMeta');
+            if (state.knowledgeBase.updated) {
+                meta.innerHTML = `<strong>Version:</strong> ${state.knowledgeBase.version} &nbsp; <strong>Updated:</strong> ${new Date(state.knowledgeBase.updated).toLocaleString()} &nbsp; <strong>Size:</strong> ${state.knowledgeBase.text.length} chars`;
+            } else {
+                meta.textContent = '';
+            }
+        }
+
+        // BRIEFING GENERATION
+        async function generateBriefing() {
+            if (!state.knowledgeBase.text) {
+                showStatus('Knowledge base is empty. Add a handover first.', 'err');
+                return;
+            }
+            const briefingEl = document.getElementById('briefing');
+            briefingEl.innerHTML = '<span style="color:#39FF14;">GENERATING</span> <span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+            showStatus('Streaming briefing from Claude...', 'ok');
+
+            try {
+                const res = await fetch(`${API_BASE}/generate`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ knowledgeBase: state.knowledgeBase, focus: state.settings.focus })
+                });
+
+                if (res.status === 401) { doLogout(); throw new Error('Session expired'); }
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
                 let briefing = '';
                 let buffer = '';
-
                 briefingEl.textContent = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
                     buffer += decoder.decode(value, { stream: true });
-
-                    // Parse SSE events — split on double newline
                     const lines = buffer.split('\n');
-                    buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
+                    buffer = lines.pop() || '';
                     for (const line of lines) {
                         if (!line.startsWith('data: ')) continue;
                         const jsonStr = line.slice(6).trim();
@@ -677,21 +663,14 @@
                                 briefing += evt.delta.text;
                                 briefingEl.textContent = briefing;
                             }
-                        } catch (e) {
-                            // Ignore parse errors on partial chunks
-                        }
+                        } catch { }
                     }
                 }
 
-                // Cache the full briefing
-                state.lastBriefing = {
-                    text: briefing,
-                    generated: new Date().toISOString()
-                };
+                state.lastBriefing = { text: briefing, generated: new Date().toISOString() };
                 await apiCall('data', 'POST', { type: 'last-briefing', data: state.lastBriefing });
-
                 updateStatusBar();
-                showStatus(`Briefing complete. ${briefing.length} chars generated.`, 'ok');
+                showStatus(`Briefing complete. ${briefing.length} chars.`, 'ok');
             } catch (e) {
                 briefingEl.textContent = `ERROR: ${e.message}`;
                 showStatus('Generation failed: ' + e.message, 'err');
@@ -700,79 +679,76 @@
 
         function loadLastBriefing() {
             if (!state.lastBriefing?.text) {
-                showStatus('No cached briefing available.', 'warn');
+                showStatus('No cached briefing.', 'warn');
                 return;
             }
             document.getElementById('briefing').textContent = state.lastBriefing.text;
             showStatus(`Loaded cached briefing from ${new Date(state.lastBriefing.generated).toLocaleString()}.`, 'ok');
         }
+
+        // COPY HELPERS
         async function copyBriefing() {
-            const briefingEl = document.getElementById('briefing');
-            const text = briefingEl.textContent || '';
-
+            const text = document.getElementById('briefing').textContent;
             if (!text.trim() || text.includes('Sprint briefing will appear here')) {
-                showStatus('Nothing to copy. Generate or load a briefing first.', 'warn');
-                return;
+                showStatus('Nothing to copy.', 'warn'); return;
             }
+            await copyToClipboard(text, 'copyBtn', 'Briefing copied');
+        }
 
-            const btn = document.getElementById('copyBtn');
-            const originalText = btn.textContent;
+        async function copyKB() {
+            const text = state.knowledgeBase.text;
+            if (!text) { showStatus('KB is empty.', 'warn'); return; }
+            await copyToClipboard(text, 'copyKBBtn', 'KB copied');
+        }
 
+        async function copyToClipboard(text, btnId, msg) {
+            const btn = document.getElementById(btnId);
+            const original = btn.textContent;
             try {
                 await navigator.clipboard.writeText(text);
                 btn.textContent = '✓ COPIED';
-                btn.style.background = '#39FF14';
-                btn.style.color = '#000';
-                showStatus(`Copied ${text.length} characters to clipboard.`, 'ok');
-                setTimeout(() => {
-                    btn.textContent = originalText;
-                    btn.style.background = '';
-                    btn.style.color = '';
-                }, 2000);
+                btn.style.background = '#39FF14'; btn.style.color = '#000';
+                showStatus(`${msg} (${text.length} chars).`, 'ok');
+                setTimeout(() => { btn.textContent = original; btn.style.background = ''; btn.style.color = ''; }, 2000);
             } catch (e) {
-                // Fallback for older browsers or permission issues
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                try {
-                    document.execCommand('copy');
-                    showStatus('Copied to clipboard.', 'ok');
-                } catch {
-                    showStatus('Copy failed. Select manually with Cmd+A / Cmd+C.', 'err');
-                }
-                document.body.removeChild(textarea);
+                showStatus('Copy failed. Use Cmd+A / Cmd+C.', 'err');
             }
         }
 
-        // ========== AUTO-TRIGGER ==========
-        async function autoTriggerCheck() {
-            const gap = getGapHours();
-            if (gap === null) {
-                if (state.conversations.length > 0) {
-                    showStatus('No prior briefing. Click GENERATE SPRINT BRIEFING.', 'warn');
-                }
-                return;
-            }
-            if (gap > state.settings.gapThreshold && state.conversations.length > 0) {
-                showStatus(`Gap of ${gap.toFixed(1)}h exceeds threshold. Auto-generating...`, 'warn');
-                setTimeout(generateBriefing, 1000);
-            } else if (state.lastBriefing?.text) {
-                document.getElementById('briefing').textContent = state.lastBriefing.text;
-                showStatus(`Loaded cached briefing (${gap.toFixed(1)}h old, within threshold).`, 'ok');
-            }
+        // STATUS
+        function getGapHours() {
+            if (!state.lastBriefing?.generated) return null;
+            return (Date.now() - new Date(state.lastBriefing.generated).getTime()) / (1000 * 60 * 60);
         }
 
-        // ========== HELPERS ==========
+        function updateStatusBar() {
+            const lastRunEl = document.getElementById('statusLastRun');
+            const gapEl = document.getElementById('statusGap');
+            const kbEl = document.getElementById('statusKB');
+
+            if (state.lastBriefing?.generated) {
+                lastRunEl.textContent = `LAST_BRIEFING: ${new Date(state.lastBriefing.generated).toLocaleString()}`;
+                const gap = getGapHours();
+                const gapStr = gap < 1 ? `${Math.round(gap * 60)}m` : `${gap.toFixed(1)}h`;
+                let cls = 'fresh', label = 'FRESH';
+                if (gap > state.settings.gapThreshold * 3) { cls = 'cold'; label = 'COLD'; }
+                else if (gap > state.settings.gapThreshold) { cls = 'stale'; label = 'STALE'; }
+                gapEl.innerHTML = `GAP: ${gapStr} <span class="gap-indicator ${cls}">${label}</span>`;
+            } else {
+                lastRunEl.textContent = 'LAST_BRIEFING: NEVER';
+                gapEl.textContent = 'GAP: —';
+            }
+
+            kbEl.textContent = `KB_VERSION: ${state.knowledgeBase.version || 0}`;
+        }
+
         function showStatus(msg, type = 'ok') {
             const area = document.getElementById('statusArea');
             const cls = type === 'err' ? 'err' : type === 'warn' ? 'warn' : '';
             area.innerHTML = `<div class="status-msg ${cls}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
         }
 
-        // ========== INIT ==========
+        // INIT
         (async function init() {
             token = localStorage.getItem('sprint-token');
             if (token) {
